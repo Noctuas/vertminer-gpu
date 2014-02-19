@@ -1223,12 +1223,12 @@ static void set_threads_hashes(unsigned int vectors,int64_t *hashes, size_t *glo
 			// use old cgminer style
 			while (threads < minthreads) {
 				threads = 1 << ((opt_scrypt ? 0 : 15) + *intensity);
-			}
-			if (threads < minthreads) {
-				if (likely(*intensity < MAX_INTENSITY))
-					(*intensity)++;
-				else
-					threads = minthreads;
+				if (threads < minthreads) {
+					if (likely(*intensity < MAX_INTENSITY))
+						(*intensity)++;
+					else
+						threads = minthreads;
+				}
 			}
 		}
 	}
