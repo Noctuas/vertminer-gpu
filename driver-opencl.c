@@ -1203,21 +1203,25 @@ static void set_threads_hashes(unsigned int vectors,int64_t *hashes, size_t *glo
 {
 	unsigned int threads = 0;
 
-	if (*shaders) {
-		// new intensity calculation based on shader count
-		// intensity 19 == shaders * minthreads
-		threads = (*shaders * minthreads << (MAX_INTENSITY-19)) >> (MAX_INTENSITY - *intensity);
 
-		if (threads < minthreads)
+	if (*rawintensity > 0) {
+		threads = *rawintensity;
+		if (threads < minthreads) {
 			threads = minthreads;
-		else if (threads % minthreads)
-			threads += minthreads - (threads % minthreads);
+		}
 	} else {
-		while (threads < minthreads) {
-			if (*rawintensity > 0) {
-				threads = *rawintensity;
-			} else {
-				// use old cgminer style
+		if (*shaders) {
+			// new intensity calculation based on shader count
+			// intensity 19 == shaders * minthreads
+			threads = (*shaders * minthreads << (MAX_INTENSITY-19)) >> (MAX_INTENSITY - *intensity);
+
+			if (threads < minthreads)
+				threads = minthreads;
+			else if (threads % minthreads)
+				threads += minthreads - (threads % minthreads);
+		} else {
+			// use old cgminer style
+			while (threads < minthreads) {
 				threads = 1 << ((opt_scrypt ? 0 : 15) + *intensity);
 			}
 			if (threads < minthreads) {
@@ -1436,7 +1440,7 @@ static void get_opencl_statline(char *buf, size_t bufsiz, struct cgpu_info *gpu)
 	if (gpu->rawintensity > 0)
 		tailsprintf(buf, bufsiz, " T:%d rI:%3d", gpu->threads, gpu->rawintensity);
 	else
-		tailsprintf(buf, bufsiz, " I:%2d", gpu->intensity);
+		tailsprintf(buf, bufsiz, " T:%d I:%2d", gpu->threads, gpu->intensity);
 }
 
 struct opencl_thread_data {
