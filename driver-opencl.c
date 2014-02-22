@@ -580,6 +580,7 @@ char *set_intensity(char *arg)
 			return "Invalid value passed to set intensity";
 		tt = &gpus[device].intensity;
 		*tt = val;
+		gpus[device].xintensity = 0; // Disable shader based intensity
 		gpus[device].rawintensity = 0; // Disable raw intensity
 	}
 
@@ -596,6 +597,7 @@ char *set_intensity(char *arg)
 
 			tt = &gpus[device].intensity;
 			*tt = val;
+			gpus[device].xintensity = 0; // Disable shader based intensity
 			gpus[device].rawintensity = 0; // Disable raw intensity
 		}
 		device++;
@@ -604,9 +606,51 @@ char *set_intensity(char *arg)
 		for (i = device; i < MAX_GPUDEVICES; i++) {
 			gpus[i].dynamic = gpus[0].dynamic;
 			gpus[i].intensity = gpus[0].intensity;
+			gpus[i].xintensity = 0; // Disable shader based intensity
 			gpus[i].rawintensity = 0; // Disable raw intensity
 		}
 	}
+
+	return NULL;
+}
+
+char *set_xintensity(char *arg)
+{
+	int i, device = 0, val = 0;
+	char *nextptr;
+
+	nextptr = strtok(arg, ",");
+	if (nextptr == NULL)
+		return "Invalid parameters for shader based intensity";
+	val = atoi(nextptr);
+	if (val == 0) return "disabled";
+	if (val < MIN_XINTENSITY || val > MAX_XINTENSITY)
+		return "Invalid value passed to set shader-based intensity";
+
+	gpus[device].dynamic = false; // Disable dynamic intensity
+	gpus[device].intensity = 0; // Disable regular intensity
+	gpus[device].rawintensity = 0; // Disable raw intensity
+	gpus[device].xintensity = val;
+	device++;
+
+	while ((nextptr = strtok(NULL, ",")) != NULL) {
+		val = atoi(nextptr);
+		if (val == 0) return "disabled";
+		if (val < MIN_XINTENSITY || val > MAX_XINTENSITY)
+			return "Invalid value passed to set shader based intensity";
+		gpus[device].dynamic = false; // Disable dynamic intensity
+		gpus[device].intensity = 0; // Disable regular intensity
+		gpus[device].rawintensity = 0; // Disable raw intensity
+		gpus[device].xintensity = val;
+		device++;
+	}
+	if (device == 1)
+		for (i = device; i < MAX_GPUDEVICES; i++) {
+			gpus[i].dynamic = gpus[0].dynamic;
+			gpus[i].intensity = gpus[0].intensity;
+			gpus[i].rawintensity = gpus[0].rawintensity;
+			gpus[i].xintensity = gpus[0].xintensity;
+		}
 
 	return NULL;
 }
@@ -625,6 +669,7 @@ char *set_rawintensity(char *arg)
 
         gpus[device].dynamic = false; // Disable dynamic intensity
         gpus[device].intensity = 0; // Disable regular intensity
+		gpus[device].xintensity = 0; // Disable xintensity
         gpus[device].rawintensity = val;
         device++;
 
@@ -634,6 +679,7 @@ char *set_rawintensity(char *arg)
                         return "Invalid value passed to set raw intensity";
                 gpus[device].dynamic = false; // Disable dynamic intensity
                 gpus[device].intensity = 0; // Disable regular intensity
+				gpus[device].xintensity = 0; // Disable xintensity
                 gpus[device].rawintensity = val;
                 device++;
         }
@@ -642,6 +688,7 @@ char *set_rawintensity(char *arg)
                         gpus[i].dynamic = gpus[0].dynamic;
                         gpus[i].intensity = gpus[0].intensity;
                         gpus[i].rawintensity = gpus[0].rawintensity;
+						gpus[i].xintensity = gpus[0].xintensity;
                 }
 
         return NULL;
@@ -718,7 +765,7 @@ retry:
 		wlog("GPU %d: %.1f / %.1f %sh/s | A:%d  R:%d  HW:%d  U:%.2f/m  I:%d  rI:%d\n",
 			gpu, displayed_rolling, displayed_total, mhash_base ? "M" : "K",
 			cgpu->accepted, cgpu->rejected, cgpu->hw_errors,
-			cgpu->utility, cgpu->intensity, cgpu->rawintensity);
+			cgpu->utility, cgpu->intensity, cgpu->xintensity, cgpu->rawintensity);
 #ifdef HAVE_ADL
 		if (gpus[gpu].has_adl) {
 			int engineclock = 0, memclock = 0, activity = 0, fanspeed = 0, fanpercent = 0, powertune = 0;
@@ -882,8 +929,38 @@ retry:
 		}
 		gpus[selected].dynamic = false;
 		gpus[selected].intensity = intensity;
+		gpus[selected].xintensity = 0; // Disable xintensity when enabling intensity
 		gpus[selected].rawintensity = 0; // Disable raw intensity when enabling intensity
 		wlogprint("Intensity on gpu %d set to %d\n", selected, intensity);
+		pause_dynamic_threads(selected);
+		goto retry;
+	} else if (!strncasecmp(&input, "x", 1)) {
+		int xintensity;
+		char *intvar;
+
+		if (selected)
+			selected = curses_int("Select GPU to change experimental intensity on");
+		if (selected < 0 || selected >= nDevs) {
+			wlogprint("Invalid selection\n");
+			goto retry;
+		}
+
+		intvar = curses_input("Set experimental GPU scan intensity (" MIN_XINTENSITY_STR " -> " MAX_XINTENSITY_STR ")");
+		if (!intvar) {
+			wlogprint("Invalid input\n");
+			goto retry;
+		}
+		xintensity = atoi(intvar);
+		free(intvar);
+		if (xintensity < MIN_XINTENSITY || xintensity > MAX_XINTENSITY) {
+			wlogprint("Invalid selection\n");
+			goto retry;
+		}
+		gpus[selected].dynamic = false;
+		gpus[selected].intensity = 0; // Disable intensity when enabling xintensity
+		gpus[selected].rawintensity = 0; // Disable raw intensity when enabling xintensity
+		gpus[selected].xintensity = xintensity;
+		wlogprint("Experimental intensity on gpu %d set to %d\n", selected, xintensity);
 		pause_dynamic_threads(selected);
 		goto retry;
 	} else if (!strncasecmp(&input, "a", 1)) {
@@ -910,6 +987,7 @@ retry:
 		}
 		gpus[selected].dynamic = false;
 		gpus[selected].intensity = 0; // Disable intensity when enabling raw intensity
+		gpus[selected].xintensity = 0; // Disable xintensity when enabling raw intensity
 		gpus[selected].rawintensity = rawintensity;
 		wlogprint("Raw intensity on gpu %d set to %d\n", selected, rawintensity);
 		pause_dynamic_threads(selected);
@@ -1198,19 +1276,17 @@ static cl_int queue_scrypt_kernel(_clState *clState, dev_blk_ctx *blk, __maybe_u
 }
 #endif
 
-static void set_threads_hashes(unsigned int vectors,int64_t *hashes, size_t *globalThreads,
-			       unsigned int minthreads, __maybe_unused int *intensity, __maybe_unused int *rawintensity, __maybe_unused size_t *shaders)
+static void set_threads_hashes(unsigned int vectors, unsigned int compute_shaders, int64_t *hashes, size_t *globalThreads,
+			       unsigned int minthreads, __maybe_unused int *intensity, __maybe_unused int *xintensity, __maybe_unused int *rawintensity, __maybe_unused size_t *shaders)
 {
 	unsigned int threads = 0;
 
-
-	if (*rawintensity > 0) {
-		threads = *rawintensity;
-		if (threads < minthreads) {
-			threads = minthreads;
-		}
-	} else {
-		if (*shaders) {
+	while (threads < minthreads) {
+		if (*rawintensity > 0) {
+			threads = *rawintensity;
+		} else if (*xintensity > 0) {
+			threads = compute_shaders * *xintensity;
+		} else if (*shaders)
 			// new intensity calculation based on shader count
 			// intensity 19 == shaders * minthreads
 			threads = (*shaders * minthreads << (MAX_INTENSITY-19)) >> (MAX_INTENSITY - *intensity);
@@ -1221,15 +1297,13 @@ static void set_threads_hashes(unsigned int vectors,int64_t *hashes, size_t *glo
 				threads += minthreads - (threads % minthreads);
 		} else {
 			// use old cgminer style
-			while (threads < minthreads) {
-				threads = 1 << ((opt_scrypt ? 0 : 15) + *intensity);
-				if (threads < minthreads) {
-					if (likely(*intensity < MAX_INTENSITY))
-						(*intensity)++;
-					else
-						threads = minthreads;
-				}
-			}
+			threads = 1 << *intensity;
+		}
+		if (threads < minthreads) {
+			if (likely(*intensity < MAX_INTENSITY))
+				(*intensity)++;
+			else
+				threads = minthreads;
 		}
 	}
 	applog(LOG_INFO, "set globalThreads to %u",threads);
@@ -1439,6 +1513,8 @@ static void get_opencl_statline(char *buf, size_t bufsiz, struct cgpu_info *gpu)
 {
 	if (gpu->rawintensity > 0)
 		tailsprintf(buf, bufsiz, " T:%d rI:%3d", gpu->threads, gpu->rawintensity);
+	else if (gpu->xintensity > 0)
+		tailsprintf(buf, bufsiz, " T:%d xI:%3d", gpu->threads, gpu->xintensity);
 	else
 		tailsprintf(buf, bufsiz, " T:%d I:%2d", gpu->threads, gpu->intensity);
 }
@@ -1640,7 +1716,7 @@ static int64_t opencl_scanhash(struct thr_info *thr, struct work *work,
 		gpu->intervals = 0;
 	}
 
-	set_threads_hashes(clState->vwidth, &hashes, globalThreads, localThreads[0], &gpu->intensity, &gpu->rawintensity, &gpu->shaders);
+	set_threads_hashes(clState->vwidth, clState->compute_shaders, &hashes, globalThreads, localThreads[0], &gpu->intensity, &gpu->xintensity, &gpu->rawintensity, &gpu->shaders);
 	if (hashes > gpu->max_hashes)
 		gpu->max_hashes = hashes;
 

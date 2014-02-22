@@ -527,6 +527,7 @@ struct cgpu_info {
 	int virtual_gpu;
 	int virtual_adl;
 	int intensity;
+	int xintensity;
 	int rawintensity;
 	bool dynamic;
 
@@ -1144,6 +1145,10 @@ extern bool add_pool_details(struct pool *pool, bool live, char *url, char *user
 #define MIN_SCRYPT_INTENSITY_STR "8"
 #define MAX_SCRYPT_INTENSITY 25
 #define MAX_SCRYPT_INTENSITY_STR "25"
+#define MIN_XINTENSITY 1
+#define MIN_XINTENSITY_STR "1"
+#define MAX_XINTENSITY 9999
+#define MAX_XINTENSITY_STR "9999"
 #define MIN_RAWINTENSITY 1
 #define MIN_RAWINTENSITY_STR "1"
 #define MAX_RAWINTENSITY 2147483647
