@@ -1286,7 +1286,7 @@ static void set_threads_hashes(unsigned int vectors, unsigned int compute_shader
 			threads = *rawintensity;
 		} else if (*xintensity > 0) {
 			threads = compute_shaders * *xintensity;
-		} else if (*shaders)
+		} else if (*shaders) {
 			// new intensity calculation based on shader count
 			// intensity 19 == shaders * minthreads
 			threads = (*shaders * minthreads << (MAX_INTENSITY-19)) >> (MAX_INTENSITY - *intensity);

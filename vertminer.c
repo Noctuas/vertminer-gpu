@@ -28,6 +28,7 @@
 #include <assert.h>
 #include <signal.h>
 #include <limits.h>
+#include <sha2.h>
 
 #ifdef USE_USBUTILS
 #include <semaphore.h>
@@ -49,7 +50,6 @@
 char *curly = ":D";
 #endif
 #include <libgen.h>
-#include <sha2.h>
 
 #include "compat.h"
 #include "miner.h"
